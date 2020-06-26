@@ -105,7 +105,7 @@ async def clear_runs(ctx):
 
     # Get all channels in this category
     category = discord.utils.get(guild.categories, name='runs')
-    channels = [c for c in guild.channels if c.category_id == category.id]
+    channels = category.channels
     await ctx.send(f'Deleting {len(channels)} channels, please wait...')
 
     roles_done = []
@@ -122,6 +122,7 @@ async def clear_runs(ctx):
     await guild.fetch_roles()
     await ctx.send(f'Channels and roles deleted')
 
+
 @bot.command(name='play', help='Plays the card with the given name')
 async def play_card(ctx: commands.context.Context, card_name: str):
     if card_name not in CARD_LIST:
@@ -130,5 +131,170 @@ async def play_card(ctx: commands.context.Context, card_name: str):
         file = discord.File(CARD_LIST[card_name], filename=f'{card_name}.png')
         await ctx.send(f'{ctx.message.author.nick or ctx.message.author.name} plays {card_name}', file=file)
 
+
+@bot.command(name='setup-server', help='Set up the server')
+@commands.has_role('admin')
+async def setup_server(ctx):
+    guild = ctx.guild
+    roles = {}
+
+    await ctx.send('Setting up the server!')
+
+    await ctx.send('Creating roles...')
+
+    for role_name in REQUIRED_ROLES:
+        role = discord.utils.get(guild.roles, name=role_name)
+        if not role:
+            role = await guild.create_role(name=role_name)
+
+        roles[role_name] = role
+
+    await ctx.send('Roles created!')
+
+    control_role = roles['control']
+
+    await ctx.send('Creating game channels...')
+
+    for game in GAME_CHANNELS:
+        category = discord.utils.get(guild.categories, name=game)
+        game_def = GAME_CHANNELS[game]
+
+        if category:
+            await delete_category(category)
+
+        required_role = roles[game_def['role']]
+
+        category = await guild.create_category(
+            name=game,
+            overwrites={
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                control_role: discord.PermissionOverwrite(read_messages=True),
+                required_role: discord.PermissionOverwrite(read_messages=True)
+            }
+        )
+
+        for channel_name in game_def['text_channels']:
+            await guild.create_text_channel(
+                channel_name,
+                category=category
+            )
+
+        for channel_name in game_def['voice_channels']:
+            await guild.create_voice_channel(
+                channel_name,
+                category=category,
+                overwrites={
+                    guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                    control_role: discord.PermissionOverwrite(read_messages=True),
+                    required_role: discord.PermissionOverwrite(read_messages=True)
+                }
+            )
+
+    await ctx.send('Game channels')
+
+    for corporation in CORPORATION_NAMES:
+        await ctx.send(f"Creating channels for {corporation}...")
+
+        corporation_role = roles[corporation.replace(' ', '-').lower()]
+
+        category = discord.utils.get(guild.categories, name=corporation)
+
+        if category:
+            await delete_category(category)
+
+        category = await guild.create_category(name=corporation)
+
+        text_channel = await guild.create_text_channel(
+            'team-chat',
+            category=category,
+            overwrites={
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                control_role: discord.PermissionOverwrite(read_messages=True),
+                corporation_role: discord.PermissionOverwrite(read_messages=True)
+            }
+        )
+
+        await text_channel.send(
+            f'Hi there {corporation_role.mention}! This is your private chat - only control and your team members can see the contents of this channel. Have fun!')
+
+        for channel_name in CORPORATION_CHANNELS:
+            await guild.create_voice_channel(
+                channel_name,
+                category=category,
+            )
+
+        await ctx.send(f"Created channels for {corporation}...")
+
+
+async def delete_category(category):
+    category_channels = category.channels
+    for channel in category_channels:
+        await channel.delete()
+
+    await category.delete()
+
+
+REQUIRED_ROLES = [
+    'control',
+    'genetic-equity',
+    'augmented-nucleotech',
+    'digital-tactical-control',
+    'gordon-corporation',
+    'muccullough-mechanical',
+    'corp-press',
+    'runner-press',
+    'runner',
+    'ceo',
+    'security',
+    'research',
+]
+
+CORPORATION_NAMES = [
+    'Augmented Nucleotech',
+    'Digital Tactical Control',
+    'Genetic Equity',
+    'Gordon Corporation',
+    'Muccullough Mechanical'
+]
+
+CORPORATION_CHANNELS = [
+    'foyer',
+    'board-room',
+    'research-lab',
+    'security',
+]
+
+GAME_CHANNELS = {
+    'Council': {
+        'role': 'ceo',
+        'text_channels': [
+            'council-motions',
+        ],
+        'voice_channels': [
+            'council-chamber',
+            'side-chamber-a',
+            'side-chamber-b',
+            'side-chamber-c',
+        ],
+    },
+    'Research': {
+        'role': 'research',
+        'text_channels': [
+            'research'
+        ],
+        'voice_channels': [
+            'research'
+        ]
+    },
+    'Security': {
+        'role': 'security',
+        'text_channels': [
+            'shop-contents',
+        ],
+        'voice_channels': [
+            'shop',
+        ]
+    }
+}
 
 bot.run(TOKEN)
