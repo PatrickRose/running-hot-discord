@@ -124,6 +124,20 @@ async def clear_runs(ctx):
             await role.delete()
             roles_done.append(role)
 
+    control_role = discord.utils.get(guild.roles, name='control')
+    runner_role = discord.utils.get(guild.roles, name='runner')
+    security_role = discord.utils.get(guild.roles, name='security')
+    await guild.create_text_channel(
+        name='run-bot-commands',
+        category=run_category,
+        overwrites={
+            guild.default_role: discord.PermissionOverwrite(read_messages=False, send_messages=False),
+            control_role: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+            runner_role: discord.PermissionOverwrite(read_messages=True),
+            security_role: discord.PermissionOverwrite(read_messages=True),
+        }
+    )
+            
     await guild.fetch_channels()
     await guild.fetch_roles()
     await ctx.send(f'Channels and roles deleted')
@@ -137,7 +151,33 @@ async def play_card(ctx: commands.context.Context, card_name: str):
         file = discord.File(CARD_LIST[card_name], filename=f'{card_name}.png')
         await ctx.send(f'{ctx.message.author.nick or ctx.message.author.name} plays {card_name}', file=file)
 
+async def create_category(guild, name, overwrites={}, text_channels={}, voice_channels={}):
+    category = discord.utils.get(guild.categories, name=name)
 
+    if category:
+        await delete_category(category)
+    
+    category = await guild.create_category(
+        name=name,
+        overwrites=overwrites
+    )
+
+    for name in text_channels:
+        await guild.create_text_channel(
+            name=name,
+            category=category,
+            overwrites=text_channels[name]
+        )
+
+    for name in voice_channels:
+        await guild.create_voice_channel(
+            name=name,
+            category=category,
+            overwrites=text_channels[name]
+        )
+
+    return category
+        
 @bot.command(name='setup-server', help='Set up the server')
 @commands.has_role('admin')
 async def setup_server(ctx):
@@ -161,6 +201,60 @@ async def setup_server(ctx):
 
     await ctx.send('Creating game channels...')
 
+    await create_category(
+        guild,
+        'Out of game',
+        text_channels={
+            'landing': {
+                guild.default_role: discord.PermissionOverwrite(read_messages=True, send_messages=False),
+            },
+            'pre-game': {},
+        }
+    )
+
+    await create_category(
+        guild,
+        'Control',
+        overwrites={
+            guild.default_role: discord.PermissionOverwrite(read_messages=True, send_messages=False),
+            roles['control']: discord.PermissionOverwrite(send_messages=True),
+        }
+    )
+
+    await create_category(
+        guild,
+        'Press',
+        overwrites={
+            guild.default_role: discord.PermissionOverwrite(read_messages=True, send_messages=False),
+            roles['control']: discord.PermissionOverwrite(send_messages=True)
+        },
+        text_channels={
+            'business-times': {
+                roles['corp-press']: discord.PermissionOverwrite(send_messages=True)
+            },
+            'th3-undergr0und': {
+                roles['runner-press']: discord.PermissionOverwrite(send_messages=True)
+            },
+        }
+    )
+
+    await create_category(
+        guild=guild,
+        name='runs',
+        overwrites={
+            guild.default_role: discord.PermissionOverwrite(read_messages=False, connect=False),
+            control_role: discord.PermissionOverwrite(read_messages=True, connect=True),
+        },
+        text_channels={
+            'run-bot-commands': {
+                guild.default_role: discord.PermissionOverwrite(read_messages=False, send_messages=False),
+                roles['control']: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+                roles['runner']: discord.PermissionOverwrite(read_messages=True),
+                roles['security']: discord.PermissionOverwrite(read_messages=True),
+            }
+        }
+    )
+
     for game in GAME_CHANNELS:
         category = discord.utils.get(guild.categories, name=game)
         game_def = GAME_CHANNELS[game]
@@ -173,20 +267,14 @@ async def setup_server(ctx):
         category = await guild.create_category(
             name=game,
             overwrites={
-                guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                control_role: discord.PermissionOverwrite(read_messages=True),
-                required_role: discord.PermissionOverwrite(read_messages=True)
+                guild.default_role: discord.PermissionOverwrite(read_messages=True, connect=False),
+                control_role: discord.PermissionOverwrite(read_messages=True, connect=True),
+                required_role: discord.PermissionOverwrite(read_messages=True, connect=True)
             }
         )
 
         for channel_name in game_def['text_channels']:
             await guild.create_text_channel(
-                channel_name,
-                category=category
-            )
-
-        for channel_name in game_def['voice_channels']:
-            await guild.create_voice_channel(
                 channel_name,
                 category=category,
                 overwrites={
@@ -194,6 +282,12 @@ async def setup_server(ctx):
                     control_role: discord.PermissionOverwrite(read_messages=True),
                     required_role: discord.PermissionOverwrite(read_messages=True)
                 }
+            )
+
+        for channel_name in game_def['voice_channels']:
+            await guild.create_voice_channel(
+                channel_name,
+                category=category
             )
 
     await ctx.send('Game channels')
@@ -221,7 +315,22 @@ async def setup_server(ctx):
         )
 
         await text_channel.send(
-            f'Hi there {corporation_role.mention}! This is your private chat - only control and your team members can see the contents of this channel. Have fun!')
+            f'Hi there {corporation_role.mention}! This is your private chat - only control and your team members can see the contents of this channel. Have fun!'
+        )
+
+        research_channel = await guild.create_text_channel(
+            'research-chat',
+            category=category,
+            overwrites={
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                control_role: discord.PermissionOverwrite(read_messages=True),
+                corporation_role: discord.PermissionOverwrite(read_messages=True)
+            }
+        )
+
+        await research_channel.send(
+            f'This channel is for cashing in research points for {corporation} - when you wish to buy research, please tag {roles["research-control"].mention}.'
+        )
 
         for channel_name in CORPORATION_CHANNELS:
             await guild.create_voice_channel(
@@ -242,6 +351,13 @@ async def delete_category(category):
 
 REQUIRED_ROLES = [
     'control',
+    'council-control',
+    'research-control',
+    'facility-control',
+    'facer',
+    'g33k',
+    'dancer',
+    'gruffster',
     'genetic-equity',
     'augmented-nucleotech',
     'digital-tactical-control',
@@ -300,6 +416,68 @@ GAME_CHANNELS = {
         'voice_channels': [
             'shop',
         ]
+    }
+}
+
+ADMIN_CHANNELS = [
+    'control-announcements',
+    'turn-announcements',
+    'facility-list',
+]
+
+PRESS_CHANNELS = [
+    {
+        'press_channel_name': 'business-times',
+        'role': 'corp-press'
+    },
+    {
+        'press_channel_name': 'th3-undergr0und',
+        'role': 'runner-press',
+    }
+]
+
+NEUTRAL_CHANNELS = [
+    'high-street',
+    'coffee-4-u',
+    'caffiene-station',
+]
+
+RUNNER_GANG_DEF = {
+    'The Valentine Cinema (Facers)': {
+        'all_channels': [
+            'box-office',
+            'parking',
+            'concessions',
+        ],
+        'role': 'facer',
+        'hq_channel': 'back-office',
+    },
+    'The Solarcade (G33ks)': {
+        'all_channels': [
+            'retro-room',
+            'penny-falls',
+            'fruit-machines',
+        ],
+        'role': 'g33k',
+        'hq_channel': 'computer-cafe'
+    },
+    'Jade (Dancers': {
+        'all_channels': [
+            'cloakroom',
+            'dance-floor',
+            'bar',
+        ],
+        'role': 'dancer',
+        'hq_channel': 'vip-lounge'
+    },
+    'The Leg and Horse (Gruffsters)': {
+        'all_channels': [
+            'street-outside',
+            'main-bar',
+            'fireplace'
+        ],
+        'role': 'gruffster',
+        'hq_channel': 'function-room'
     }
 }
 
