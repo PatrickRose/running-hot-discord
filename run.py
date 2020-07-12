@@ -27,7 +27,8 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.errors.MissingRequiredArgument):
         await ctx.send(error)
     elif isinstance(error, commands.errors.CommandNotFound):
-        await ctx.send(error)
+        # Don't send anything to the server because of how other bots work
+        print(error)
     else:
         control = discord.utils.get(ctx.guild.roles, name='control')
 
@@ -96,6 +97,11 @@ async def create_run(ctx):
 
     if channel_message:
         await text_channel.send(f'{channel_message.strip()}, please report to this channel to resolve the run')
+
+    await text_channel.send("When resolving rolls, use the `!roll` command.\nTo roll 6 d8 and count the number of "
+                            "success, use `!roll 6d8 t5`.\nTo roll 6 d6 and count the number of successes, "
+                            "use `!roll 6d6 t5`\nYou can play cards using the `!play` command - see your "
+                            "relevant Google doc for the command you need")
 
 
 @bot.command(name='clear-runs', help='Deletes *all* run channels and roles for end of turn clean up')
