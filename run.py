@@ -118,49 +118,36 @@ async def clear_runs(ctx):
 
     for channel in channels:
         role = discord.utils.get(guild.roles, name=channel.name)
-        await channel.delete()
+        if channel.name != "run-bot-commands":
+            await channel.delete()
 
         if role and role not in roles_done:
             await role.delete()
             roles_done.append(role)
 
-    control_role = discord.utils.get(guild.roles, name='control')
-    runner_role = discord.utils.get(guild.roles, name='runner')
-    security_role = discord.utils.get(guild.roles, name='security')
-    await guild.create_text_channel(
-        name='run-bot-commands',
-        category=run_category,
-        overwrites={
-            guild.default_role: discord.PermissionOverwrite(read_messages=False, send_messages=False),
-            control_role: discord.PermissionOverwrite(read_messages=True, send_messages=True),
-            runner_role: discord.PermissionOverwrite(read_messages=True),
-            security_role: discord.PermissionOverwrite(read_messages=True),
-        }
-    )
-            
     await guild.fetch_channels()
     await guild.fetch_roles()
     await ctx.send(f'Channels and roles deleted')
 
 
 @bot.command(name='play', help='Plays the card with the given name')
-async def play_card(ctx: commands.context.Context, card_name: str):
-    if card_name not in CARD_LIST:
-        await ctx.send(f'{ctx.message.author.mention} Unknown card {card_name}')
+async def play_card(ctx: commands.context.Context, card: str):
+    if card not in CARD_LIST:
+        await ctx.send(f'{ctx.message.author.mention} Unknown card {card}')
     else:
-        file = discord.File(CARD_LIST[card_name], filename=f'{card_name}.png')
+        card_name = CARD_LIST[card]
+        file = discord.File(f'card-images/{card}.png', filename=f'{card_name}.png')
         await ctx.send(f'{ctx.message.author.nick or ctx.message.author.name} plays {card_name}', file=file)
+
 
 async def create_category(guild, name, overwrites={}, text_channels={}, voice_channels={}):
     category = discord.utils.get(guild.categories, name=name)
 
-    if category:
-        await delete_category(category)
-    
-    category = await guild.create_category(
-        name=name,
-        overwrites=overwrites
-    )
+    if not category:
+        category = await guild.create_category(
+            name=name,
+            overwrites=overwrites
+        )
 
     for name in text_channels:
         await guild.create_text_channel(
@@ -177,168 +164,6 @@ async def create_category(guild, name, overwrites={}, text_channels={}, voice_ch
         )
 
     return category
-        
-@bot.command(name='setup-server', help='Set up the server')
-@commands.has_role('admin')
-async def setup_server(ctx):
-    guild = ctx.guild
-    roles = {}
-
-    await ctx.send('Setting up the server!')
-
-    await ctx.send('Creating roles...')
-
-    for role_name in REQUIRED_ROLES:
-        role = discord.utils.get(guild.roles, name=role_name)
-        if not role:
-            role = await guild.create_role(name=role_name)
-
-        roles[role_name] = role
-
-    await ctx.send('Roles created!')
-
-    control_role = roles['control']
-
-    await ctx.send('Creating game channels...')
-
-    await create_category(
-        guild,
-        'Out of game',
-        text_channels={
-            'landing': {
-                guild.default_role: discord.PermissionOverwrite(read_messages=True, send_messages=False),
-            },
-            'pre-game': {},
-        }
-    )
-
-    await create_category(
-        guild,
-        'Control',
-        overwrites={
-            guild.default_role: discord.PermissionOverwrite(read_messages=True, send_messages=False),
-            roles['control']: discord.PermissionOverwrite(send_messages=True),
-        }
-    )
-
-    await create_category(
-        guild,
-        'Press',
-        overwrites={
-            guild.default_role: discord.PermissionOverwrite(read_messages=True, send_messages=False),
-            roles['control']: discord.PermissionOverwrite(send_messages=True)
-        },
-        text_channels={
-            'business-times': {
-                roles['corp-press']: discord.PermissionOverwrite(send_messages=True)
-            },
-            'th3-undergr0und': {
-                roles['runner-press']: discord.PermissionOverwrite(send_messages=True)
-            },
-        }
-    )
-
-    await create_category(
-        guild=guild,
-        name='runs',
-        overwrites={
-            guild.default_role: discord.PermissionOverwrite(read_messages=False, connect=False),
-            control_role: discord.PermissionOverwrite(read_messages=True, connect=True),
-        },
-        text_channels={
-            'run-bot-commands': {
-                guild.default_role: discord.PermissionOverwrite(read_messages=False, send_messages=False),
-                roles['control']: discord.PermissionOverwrite(read_messages=True, send_messages=True),
-                roles['runner']: discord.PermissionOverwrite(read_messages=True),
-                roles['security']: discord.PermissionOverwrite(read_messages=True),
-            }
-        }
-    )
-
-    for game in GAME_CHANNELS:
-        category = discord.utils.get(guild.categories, name=game)
-        game_def = GAME_CHANNELS[game]
-
-        if category:
-            await delete_category(category)
-
-        required_role = roles[game_def['role']]
-
-        category = await guild.create_category(
-            name=game,
-            overwrites={
-                guild.default_role: discord.PermissionOverwrite(read_messages=True, connect=False),
-                control_role: discord.PermissionOverwrite(read_messages=True, connect=True),
-                required_role: discord.PermissionOverwrite(read_messages=True, connect=True)
-            }
-        )
-
-        for channel_name in game_def['text_channels']:
-            await guild.create_text_channel(
-                channel_name,
-                category=category,
-                overwrites={
-                    guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                    control_role: discord.PermissionOverwrite(read_messages=True),
-                    required_role: discord.PermissionOverwrite(read_messages=True)
-                }
-            )
-
-        for channel_name in game_def['voice_channels']:
-            await guild.create_voice_channel(
-                channel_name,
-                category=category
-            )
-
-    await ctx.send('Game channels')
-
-    for corporation in CORPORATION_NAMES:
-        await ctx.send(f"Creating channels for {corporation}...")
-
-        corporation_role = roles[corporation.replace(' ', '-').lower()]
-
-        category = discord.utils.get(guild.categories, name=corporation)
-
-        if category:
-            await delete_category(category)
-
-        category = await guild.create_category(name=corporation)
-
-        text_channel = await guild.create_text_channel(
-            'team-chat',
-            category=category,
-            overwrites={
-                guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                control_role: discord.PermissionOverwrite(read_messages=True),
-                corporation_role: discord.PermissionOverwrite(read_messages=True)
-            }
-        )
-
-        await text_channel.send(
-            f'Hi there {corporation_role.mention}! This is your private chat - only control and your team members can see the contents of this channel. Have fun!'
-        )
-
-        research_channel = await guild.create_text_channel(
-            'research-chat',
-            category=category,
-            overwrites={
-                guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                control_role: discord.PermissionOverwrite(read_messages=True),
-                corporation_role: discord.PermissionOverwrite(read_messages=True)
-            }
-        )
-
-        await research_channel.send(
-            f'This channel is for cashing in research points for {corporation} - when you wish to buy research, please tag {roles["research-control"].mention}.'
-        )
-
-        for channel_name in CORPORATION_CHANNELS:
-            await guild.create_voice_channel(
-                channel_name,
-                category=category,
-            )
-
-        await ctx.send(f"Created channels for {corporation}...")
 
 
 async def delete_category(category):
@@ -349,136 +174,71 @@ async def delete_category(category):
     await category.delete()
 
 
-REQUIRED_ROLES = [
-    'control',
-    'council-control',
-    'research-control',
-    'facility-control',
-    'facer',
-    'g33k',
-    'dancer',
-    'gruffster',
-    'genetic-equity',
-    'augmented-nucleotech',
-    'digital-tactical-control',
-    'gordon-corporation',
-    'muccullough-mechanical',
-    'corp-press',
-    'runner-press',
-    'runner',
-    'ceo',
-    'security',
+CORPORATION_NAMES = {
+    'augmented': 'Augmented Nucleotech',
+    'dtc': 'Digital Tactical Control',
+    'genetic': 'Genetic Equity',
+    'gordon': 'Gordon Corporation',
+    'muccullough': 'MucCullough Mechanical'
+}
+
+FACILITY_TYPES = [
     'research',
-]
-
-CORPORATION_NAMES = [
-    'Augmented Nucleotech',
-    'Digital Tactical Control',
-    'Genetic Equity',
-    'Gordon Corporation',
-    'Muccullough Mechanical'
-]
-
-CORPORATION_CHANNELS = [
-    'foyer',
-    'board-room',
-    'research-lab',
     'security',
+    'corporate',
+    'ai-school'
 ]
 
-GAME_CHANNELS = {
-    'Council': {
-        'role': 'ceo',
-        'text_channels': [
-            'council-motions',
-        ],
-        'voice_channels': [
-            'council-chamber',
-            'side-chamber-a',
-            'side-chamber-b',
-            'side-chamber-c',
-        ],
-    },
-    'Research': {
-        'role': 'research',
-        'text_channels': [
-            'research'
-        ],
-        'voice_channels': [
-            'research'
-        ]
-    },
-    'Security': {
-        'role': 'security',
-        'text_channels': [
-            'shop-contents',
-        ],
-        'voice_channels': [
-            'shop',
-        ]
-    }
-}
 
-ADMIN_CHANNELS = [
-    'control-announcements',
-    'turn-announcements',
-    'facility-list',
-]
+@bot.command(name='build-facility', help='Builds a facility')
+@commands.has_role('control')
+async def play_card(ctx: commands.context.Context, corporation_name: str, facility_type: str, facility_name: str):
+    if corporation_name not in CORPORATION_NAMES:
+        await ctx.send(
+            f'{0} not found (must be one of {1})'.format(
+                corporation_name,
+                ','.join(str(x) for x in CORPORATION_NAMES)
+            )
+        )
+        return
 
-PRESS_CHANNELS = [
-    {
-        'press_channel_name': 'business-times',
-        'role': 'corp-press'
-    },
-    {
-        'press_channel_name': 'th3-undergr0und',
-        'role': 'runner-press',
-    }
-]
+    if facility_type not in FACILITY_TYPES:
+        await ctx.send(f'Unknown facility type {facility_type}')
+        return
 
-NEUTRAL_CHANNELS = [
-    'high-street',
-    'coffee-4-u',
-    'caffiene-station',
-]
+    guild = ctx.guild
 
-RUNNER_GANG_DEF = {
-    'The Valentine Cinema (Facers)': {
-        'all_channels': [
-            'box-office',
-            'parking',
-            'concessions',
-        ],
-        'role': 'facer',
-        'hq_channel': 'back-office',
-    },
-    'The Solarcade (G33ks)': {
-        'all_channels': [
-            'retro-room',
-            'penny-falls',
-            'fruit-machines',
-        ],
-        'role': 'g33k',
-        'hq_channel': 'computer-cafe'
-    },
-    'Jade (Dancers': {
-        'all_channels': [
-            'cloakroom',
-            'dance-floor',
-            'bar',
-        ],
-        'role': 'dancer',
-        'hq_channel': 'vip-lounge'
-    },
-    'The Leg and Horse (Gruffsters)': {
-        'all_channels': [
-            'street-outside',
-            'main-bar',
-            'fireplace'
-        ],
-        'role': 'gruffster',
-        'hq_channel': 'function-room'
-    }
-}
+    from discord import TextChannel
+    channel: TextChannel = discord.utils.get(guild.channels, name='facility-list')
+
+    assert channel is not None, "facility-list was not found?"
+
+    corporation_name = CORPORATION_NAMES[corporation_name]
+
+    facilities = []
+    message_to_edit: discord.message = None
+
+    async for message in channel.history():
+        if corporation_name in message.content:
+            facilities = [[y.strip() for y in x.split('|')[1:-1]] for x in message.content.split("\n")[4:-1]]
+            message_to_edit = message
+            break
+
+    # Make sure the names are unique
+    if facility_name in [x[0] for x in facilities]:
+        await ctx.send(f'{ctx.message.author.mention} - Already have a facility with that name')
+        return
+
+    facilities.append([facility_name, facility_type])
+
+    from tabulate import tabulate
+    message_contents = f'{corporation_name} facilities:\n```\n{tabulate(facilities, ["Facility name", "Facility Type"], tablefmt="github")}\n```'
+
+    if message_to_edit:
+        await message_to_edit.edit(content=message_contents)
+    else:
+        await channel.send(message_contents)
+
+    await ctx.send(f'{ctx.message.author.mention} - facility built')
 
 bot.run(TOKEN)
