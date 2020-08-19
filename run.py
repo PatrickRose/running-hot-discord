@@ -234,10 +234,10 @@ async def play_card(ctx: commands.context.Context, corporation_name: str, facili
     from tabulate import tabulate
     message_contents = f'{corporation_name} facilities:\n```\n{tabulate(facilities, ["Facility name", "Facility Type"], tablefmt="github")}\n```'
 
+    await channel.send(message_contents)
+
     if message_to_edit:
-        await message_to_edit.edit(content=message_contents)
-    else:
-        await channel.send(message_contents)
+        await message_to_edit.delete()
 
     await ctx.send(f'{ctx.message.author.mention} - facility built')
 
