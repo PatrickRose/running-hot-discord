@@ -29,7 +29,7 @@ async def on_command_error(ctx, error):
         await ctx.send(error)
     elif isinstance(error, commands.errors.CommandNotFound):
         # Don't send anything to the server because of how other bots work
-        print(error)
+        pass
     else:
         control = discord.utils.get(ctx.guild.roles, name='control')
 
@@ -53,9 +53,10 @@ async def create_run(ctx, short_corp: str, facility: str):
         )
         return
 
-    category: discord.CategoryChannel = discord.utils.get(guild.categories, name='runs')
+    category_name = f'runs-{short_corp}'
+    category: discord.CategoryChannel = discord.utils.get(guild.categories, name=category_name)
     if not category:
-        category = await guild.create_category('runs')
+        category = await guild.create_category(category_name)
 
     text_channel: discord.TextChannel = discord.utils.get(category.text_channels,
                                                           name=f'{short_corp}-{facility.lower()}')
@@ -98,14 +99,12 @@ async def create_run(ctx, short_corp: str, facility: str):
 
             random_bytes = random.getrandbits(16)
 
-            print("hash value: %032x" % random_bytes)
-
             role_name = f"run-{random_bytes}"
             # Next, create the run-* role
             role = discord.utils.get(guild.roles, name=role_name)
 
             if not role:
-                await guild.create_role(name=role_name)
+                role = await guild.create_role(name=role_name)
                 send_initiation_message = True
                 break
 
@@ -134,28 +133,32 @@ async def clear_runs(ctx):
     guild = ctx.guild
 
     # Get all channels in this category
-    category = discord.utils.get(guild.categories, name='runs')
-    channels = category.text_channels
-    await ctx.send(f'Deleting content in {len(channels)} channels, please wait...')
+    for corp_name in CORPORATION_NAMES:
+        category_name = f'runs-{corp_name}'
+        category = discord.utils.get(guild.categories, name=category_name)
+
+        if category:
+            channels = category.text_channels
+            await ctx.send(f'Deleting content in {len(channels)} channels, please wait...')
+
+            channel: discord.TextChannel
+            delta = datetime.timedelta(days=14)
+            for channel in channels:
+                msgs = await channel.history(limit=100, after=datetime.datetime.now() - delta).flatten()
+                if not msgs:
+                    continue
+
+                try:
+                    await ctx.send(f'Deleting content in {channel.name}')
+                    await channel.delete_messages(msgs)
+                except discord.DiscordException:
+                    continue
 
     from discord import Role
     role: Role
     for role in guild.roles:
         if role.name.find('run-') == 0:
             await role.delete()
-
-    channel: discord.TextChannel
-    delta = datetime.timedelta(days=14)
-    for channel in channels:
-        msgs = await channel.history(limit=100, after=datetime.datetime.now() - delta).flatten()
-        if not msgs:
-            continue
-
-        try:
-            await ctx.send(f'Deleting content in {channel.name}')
-            await channel.delete_messages(msgs)
-        except discord.DiscordException:
-            continue
 
     await ctx.send(f'Runs cleared')
     await guild.fetch_roles()
@@ -279,7 +282,11 @@ async def build_facility(ctx: commands.context.Context, short_corp: str, facilit
     control = discord.utils.get(guild.roles, name='control')
 
     role = discord.utils.get(guild.roles, name=CORPORATION_ROLE_NAMES[short_corp])
-    category = discord.utils.get(guild.categories, name='runs')
+    category_name = f'runs-{short_corp}'
+    category = discord.utils.get(guild.categories, name=category_name)
+
+    if not category:
+        category = await guild.create_category(category_name)
 
     await guild.create_text_channel(
         name=channel_name,
@@ -310,7 +317,7 @@ async def remove_facility(ctx: commands.context.Context, short_corp: str, facili
     from discord import TextChannel
     from tabulate import tabulate
 
-    guild = ctx.guild
+    guild: discord.Guild = ctx.guild
 
     channel: TextChannel = discord.utils.get(guild.channels, name='facility-list')
 
@@ -333,6 +340,7 @@ async def remove_facility(ctx: commands.context.Context, short_corp: str, facili
 
             while channel:
                 await channel.delete()
+                await guild.fetch_channels()
                 channel = discord.utils.get(guild.channels, name=f'{short_corp}-{facility_name.lower()}')
 
             await ctx.send(f'{ctx.message.author.mention} - facility removed')
