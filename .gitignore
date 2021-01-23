@@ -1,5 +1,2 @@
 .env
-cards.json
 venv/
-/cards.json
-/card-images/
