@@ -21,6 +21,8 @@ async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
 
 
+control_role_name = 'Control' if os.getenv('UPPERCASE_CONTROL') else 'control'
+
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.errors.CheckFailure):
@@ -31,7 +33,7 @@ async def on_command_error(ctx, error):
         # Don't send anything to the server because of how other bots work
         pass
     else:
-        control = discord.utils.get(ctx.guild.roles, name='control')
+        control = discord.utils.get(ctx.guild.roles, name=control)
 
         await ctx.send(f'{control.mention} there was a problem running this command please investigate')
         raise error
@@ -128,7 +130,7 @@ async def create_run(ctx, short_corp: str, facility: str):
 
 
 @bot.command(name='clear-runs', help='Deletes *all* run channels and roles for end of turn clean up')
-@commands.has_role('control')
+@commands.has_role(control_role_name)
 async def clear_runs(ctx):
     guild = ctx.guild
 
@@ -232,7 +234,7 @@ CORPORATION_ROLE_NAMES = {
 
 
 @bot.command(name='build-facility', help='Builds a facility')
-@commands.has_role('control')
+@commands.has_role(control_role_name)
 async def build_facility(ctx: commands.context.Context, short_corp: str, facility_type: str, facility_name: str):
     if short_corp not in CORPORATION_NAMES:
         await ctx.send(
@@ -279,7 +281,7 @@ async def build_facility(ctx: commands.context.Context, short_corp: str, facilit
 
     # Now create a run channel
     channel_name = f'{short_corp}-{facility_name.lower()}'
-    control = discord.utils.get(guild.roles, name='control')
+    control = discord.utils.get(guild.roles, name=control_role_name)
 
     role = discord.utils.get(guild.roles, name=CORPORATION_ROLE_NAMES[short_corp])
     category_name = f'runs-{short_corp}'
@@ -312,7 +314,7 @@ async def build_facility(ctx: commands.context.Context, short_corp: str, facilit
 
 
 @bot.command(name='remove-facility', help='Remove a facility')
-@commands.has_role('control')
+@commands.has_role(control_role_name)
 async def remove_facility(ctx: commands.context.Context, short_corp: str, facility_name: str):
     from discord import TextChannel
     from tabulate import tabulate
