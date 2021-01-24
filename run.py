@@ -33,7 +33,7 @@ async def on_command_error(ctx, error):
         # Don't send anything to the server because of how other bots work
         pass
     else:
-        control = discord.utils.get(ctx.guild.roles, name=control)
+        control = discord.utils.get(ctx.guild.roles, name=control_role_name)
 
         await ctx.send(f'{control.mention} there was a problem running this command please investigate')
         raise error
