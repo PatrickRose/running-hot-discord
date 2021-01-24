@@ -31,7 +31,7 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.errors.MissingRequiredArgument):
         await ctx.send(error)
     elif isinstance(error, commands.errors.CommandNotFound):
-        # Don't send anything to the server because of how other bots work
+        await ctx.send("Unknown command - try {0}help to see the available commands".format(command_prefix))
         pass
     else:
         control = discord.utils.get(ctx.guild.roles, name=control_role_name)
