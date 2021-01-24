@@ -13,7 +13,8 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 with open('cards.json') as cards:
     CARD_LIST = json.load(cards)
 
-bot = commands.Bot(command_prefix='!')
+command_prefix = os.getenv('COMMAND_PREFIX', '!!')
+bot = commands.Bot(command_prefix=command_prefix)
 
 
 @bot.event
@@ -119,10 +120,11 @@ async def create_run(ctx, short_corp: str, facility: str):
         await text_channel.send(
             f"!!! RUN INITIATED !!!\n{corp_role.mention} please send your security representative to defend")
 
-        await text_channel.send("When resolving rolls, use the `!roll` command.\nTo roll 6 d8 and count the number of "
-                                "success, use `!roll 6d8 t5`.\nTo roll 6 d6 and count the number of successes, "
-                                "use `!roll 6d6 t5`\nYou can play cards using the `!play` command - see your "
-                                "relevant Google doc for the command you need")
+        await text_channel.send(
+            "When resolving rolls, use the `!roll` command.\nTo roll 6 d8 and count the number of success, use `!roll 6d8 t5`.\nTo roll 6 d6 and count the number of successes, use `!roll 6d6 t5`\nYou can play cards using the `{0}play` command - see your relevant Google doc for the command you need".format(
+                command_prefix
+            )
+        )
 
     await ctx.message.author.add_roles(role)
 
