@@ -225,11 +225,11 @@ CORPORATION_NAMES = {
 }
 
 CORPORATION_ROLE_NAMES = {
-    'augmented': 'augmented-nucleotech',
-    'dtc': 'digital-tactical-control',
-    'genetic': 'genetic-equity',
-    'gordon': 'gordon-corporation',
-    'mccullough': 'mccullough-mechanical'
+    'augmented': os.getenv('ANT_ROLE_NAME', 'augmented-nucleotech'),
+    'dtc': os.getenv('DTC_ROLE_NAME', 'digital-tactical-control'),
+    'genetic': os.getenv('GENEQ_ROLE_NAME', 'genetic-equity'),
+    'gordon': os.getenv('GORDON_ROLE_NAME', 'gordon-corporation'),
+    'mccullough': os.getenv('MCM_ROLE_NAME', 'mccullough-mechanical')
 }
 
 
