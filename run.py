@@ -2,6 +2,7 @@
 import datetime
 import json
 import os
+import random
 
 import discord
 from discord.ext import commands
@@ -98,8 +99,6 @@ async def create_run(ctx, short_corp: str, facility: str):
     if not role:
         # Work out what's the new run number
         while True:
-            import random
-
             random_bytes = random.getrandbits(16)
 
             role_name = f"run-{random_bytes}"
@@ -351,9 +350,27 @@ async def remove_facility(ctx: commands.context.Context, short_corp: str, facili
 
             break
 
-
 async def facility_from_message(message):
     return [[y.strip() for y in x.split('|')[1:-1]] for x in message.content.split("\n")[4:-1]]
 
+
+@bot.command(name='roll', help='Rolls dice')
+async def roll_dice(ctx: commands.context.Context, die_string: str):
+    try:
+        (amount, die_type) = die_string.split('d')
+        amount = int(amount)
+        die_type = int(die_type)
+    except ValueError:
+        await ctx.send(f'{ctx.message.author.mention} dice format unknown - use `1d6`, `5d8` etc')
+        return
+
+    values = [random.randint(1, die_type) for _ in range(amount)]
+    values.sort(reverse=True)
+    values = [f"**{x}**" if x >= 5 else str(x) for x in values]
+    success = list(filter(lambda x: x[0] == '*', values))
+
+    result = f'{len(success)}\nRolls: {", ".join(values)}'
+
+    await ctx.send(f'{ctx.message.author.mention} rolls `{die_string}`: {result}')
 
 bot.run(TOKEN)
