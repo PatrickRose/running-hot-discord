@@ -35,7 +35,7 @@ async def on_command_error(ctx, error):
         await ctx.send("Unknown command - try {0}help to see the available commands".format(command_prefix))
         pass
     else:
-        control = discord.utils.get(ctx.guild.roles, name=control_role_name)
+        control = discord.utils.get(ctx.guild.roles, name='bot-master')
 
         await ctx.send(f'{control.mention} there was a problem running this command please investigate')
         raise error
