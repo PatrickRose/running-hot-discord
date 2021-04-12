@@ -17,7 +17,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 with open('cards.json') as cards:
     CARD_LIST = json.load(cards)
 
-command_prefix = os.getenv('COMMAND_PREFIX', '!!')
+command_prefix = os.getenv('COMMAND_PREFIX', '!')
 bot = commands.Bot(command_prefix=command_prefix)
 
 group_regex = re.compile('Runner Group (\\d+): (.+)')
@@ -707,12 +707,13 @@ async def boost(ctx: commands.context.Context):
         [
             'Section', 'Amount', 'Bonus'
         ],
-        tablefmt = "github"
+        tablefmt="github"
     )
 
     await ctx.send(
-        f'```\n{table}\n```\nTotal bonus: +{bonus_from_boost+bonus_from_alerts+bonus_from_depth}'
+        f'```\n{table}\n```\nTotal bonus: +{bonus_from_boost + bonus_from_alerts + bonus_from_depth}'
     )
+
 
 @bot.command(name='clear-runs', help='Deletes *all* run channels and roles for end of turn clean up')
 @commands.has_role(control_role_name)
