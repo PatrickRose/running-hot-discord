@@ -11,6 +11,9 @@ import tabulate
 from discord.ext import commands
 from dotenv import load_dotenv
 
+intents = discord.Intents.default()
+intents.members = True
+
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
@@ -18,7 +21,7 @@ with open('cards.json') as cards:
     CARD_LIST = json.load(cards)
 
 command_prefix = os.getenv('COMMAND_PREFIX', '!')
-bot = commands.Bot(command_prefix=command_prefix)
+bot = commands.Bot(command_prefix=command_prefix, intents=intents)
 
 group_regex = re.compile('Runner Group (\\d+): (.+)')
 defenders_regex = re.compile('Defenders: (.+)')
