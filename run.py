@@ -821,17 +821,87 @@ CORPORATION_ROLE_NAMES = {
 }
 
 
-@bot.command(name='build-facility', help='Builds a facility')
+@bot.command(name='starting-facilities', help='Builds all the starting facilities')
 @commands.has_role(control_role_name)
-async def build_facility(ctx: commands.context.Context, short_corp: str, facility_type: str, facility_name: str):
+async def build_starting_facilities(ctx: commands.context.Context):
+    starting_facilities = {
+        'augmented': [
+            ('Corporate', 'SameignlegurA'),
+            ('Research', 'RannsóknirA'),
+            ('Security', 'MátturA'),
+            ('Power', 'OrkaA'),
+        ],
+        'dtc': [
+            ('Arms', 'ArmsA'),
+            ('Corporate', 'CorporateA'),
+            ('Research', 'ResearchA'),
+            ('Security', 'SecurityA'),
+            ('Security', 'SecurityB'),
+        ],
+        'genetic': [
+            ('Corporate', 'CorporateA'),
+            ('Research', 'ResearchA'),
+            ('Research', 'ResearchB'),
+            ('Research', 'ResearchC'),
+            ('Security', 'SecurityA'),
+        ],
+        'gordon': [
+            ('Corporate', 'CorporateA'),
+            ('Corporate', 'CorporateB'),
+            ('Corporate', 'CorporateC'),
+            ('Research', 'ResearchA'),
+            ('Security', 'SecurityA'),
+        ],
+        'mccullough': [
+            ('Corporate', 'CorporateA'),
+            ('Factory', 'FactoryA'),
+            ('Research', 'ResearchA'),
+            ('Research', 'ResearchB'),
+            ('Security', 'SecurityA'),
+        ]
+    }
+
+    guild = ctx.guild
+
+    channel: discord.TextChannel = discord.utils.get(guild.channels, name='facility-list')
+
+    delta = datetime.timedelta(days=100)
+    await ctx.send('Clearing up old facilities...')
+    while True:
+        msgs = await channel.history(limit=100, after=datetime.datetime.now() - delta).flatten()
+        if not msgs:
+            break
+
+        try:
+            await channel.delete_messages(msgs)
+        except discord.DiscordException:
+            continue
+
+    for short_corp in starting_facilities:
+        await ctx.send(f'Doing {CORPORATION_NAMES[short_corp]}')
+        corp_facilities = starting_facilities[short_corp]
+
+        category_name = f'runs-{short_corp}'
+        category = discord.utils.get(guild.categories, name=category_name)
+
+        if category:
+            await delete_category(category)
+            await guild.fetch_channels()
+
+        for (facility_type, facility_name) in corp_facilities:
+            await raw_build_facility(ctx, short_corp, facility_type, facility_name)
+
+    await ctx.reply('Done! *phew*')
+
+
+async def raw_build_facility(ctx: commands.context.Context, short_corp: str, facility_type: str, facility_name: str):
     if short_corp not in CORPORATION_NAMES:
-        await ctx.send(
+        raise ValueError(
             '{0} not found (must be one of {1})'.format(
                 short_corp,
                 ', '.join(CORPORATION_NAMES)
             )
         )
-        return
 
     guild = ctx.guild
 
@@ -853,18 +923,17 @@ async def build_facility(ctx: commands.context.Context, short_corp: str, facilit
 
     # Make sure the names are unique
     if facility_name in [x[0] for x in facilities]:
-        await ctx.send(f'{ctx.message.author.mention} - Already have a facility with that name')
-        return
+        raise ValueError('Already have a facility with that name')
 
     facilities.append([facility_name, facility_type])
 
     table_string = tabulate.tabulate(facilities, ["Facility name", "Facility Type"], tablefmt="github")
     message_contents = f'{corporation_name} facilities:\n```\n{table_string}\n```'
 
-    await channel.send(message_contents)
-
     if message_to_edit:
-        await message_to_edit.delete()
+        await message_to_edit.edit(content=message_contents)
+    else:
+        await channel.send(message_contents)
 
     # Now create a run channel
     channel_name = f'{short_corp}-{facility_name.lower()}'
@@ -897,7 +966,15 @@ async def build_facility(ctx: commands.context.Context, short_corp: str, facilit
         }
     )
 
-    await ctx.send(f'{ctx.message.author.mention} - facility built')
+
+@bot.command(name='build-facility', help='Builds a facility')
+@commands.has_role(control_role_name)
+async def build_facility(ctx: commands.context.Context, short_corp: str, facility_type: str, facility_name: str):
+    try:
+        await raw_build_facility(ctx, short_corp, facility_type, facility_name)
+        await ctx.reply(f'facility built')
+    except ValueError as error:
+        await ctx.reply(error.args[0])
 
 
 @bot.command(name='remove-facility', help='Remove a facility')
