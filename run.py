@@ -172,14 +172,6 @@ class RunStatus:
 
                 protection_cards.append(ProtectionCard(card_id, card_name, card_boost))
 
-        print({
-            'groups': [str(x) for x in groups],
-            'alerts': alerts,
-            'current_depth': current_depth,
-            'defenders': defenders,
-            'protection_cards': protection_cards,
-        })
-
         return RunStatus(
             groups=groups,
             alerts=alerts,
