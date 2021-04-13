@@ -364,7 +364,7 @@ async def create_run(ctx, short_corp: str, facility: str):
             f" - see your relevant Google doc for the command you need"
         )
     else:
-        message = await pinned_message_from_context(ctx)
+        message = await pinned_message_from_channel(text_channel)
 
         status = RunStatus.from_message(message)
 
@@ -432,7 +432,10 @@ async def join_group(ctx: commands.context.Context, group_num: int):
 
 
 async def pinned_message_from_context(ctx):
-    channel: discord.TextChannel = ctx.channel
+    return await pinned_message_from_channel(ctx.channel)
+
+
+async def pinned_message_from_channel(channel: discord.TextChannel):
     pins = await channel.pins()
     if not pins:
         raise ValueError('No pinned message found, did you run this in a run channel?')
