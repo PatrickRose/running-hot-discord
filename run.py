@@ -473,6 +473,7 @@ async def start_run(ctx: commands.context.Context, group_num=1):
         return
 
     status = RunStatus.from_message(message)
+    status.current_depth = -1
 
     await ctx.send(f'Beginning defence against group {group_num}...')
 
@@ -661,7 +662,12 @@ async def boost(ctx: commands.context.Context, amount: int):
 
     await message.edit(content=status)
 
-    await ctx.send('Boosted `{}` by {} (new amount is {})'.format(active_card.card_name, amount, active_card.boost))
+    amount_to_pay = sum(range(active_card.boost - amount + 1, active_card.boost + 1))
+
+    await ctx.send(
+        f'Boosted `{active_card.card_name}` by {amount} (new amount is {active_card.boost})\n'
+        f'Don\'t forget pay the cost for it (you should pay `{amount_to_pay}`)'
+    )
 
 
 @bot.command(name='calculate-strength', help='Calculate the strength of the currently active card')
@@ -708,8 +714,9 @@ async def boost(ctx: commands.context.Context):
         tablefmt="github"
     )
 
+    total_bonus = bonus_from_boost + bonus_from_alerts + bonus_from_depth
     await ctx.send(
-        f'```\n{table}\n```\nTotal bonus: +{bonus_from_boost + bonus_from_alerts + bonus_from_depth}'
+        f'```\n{table}\n```Total bonus dice: {total_bonus}'
     )
 
 
