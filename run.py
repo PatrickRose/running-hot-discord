@@ -259,6 +259,8 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.errors.CommandNotFound):
         await ctx.send("Unknown command - try {0}help to see the available commands".format(command_prefix))
         pass
+    elif isinstance(error, discord.ext.commands.errors.BadArgument):
+        await ctx.reply(error.args[0])
     else:
         control = discord.utils.get(ctx.guild.roles, name='bot-master')
 
@@ -459,7 +461,7 @@ async def run_status(ctx: commands.context.Context):
     await ctx.send(content=str(RunStatus.from_message(message)))
 
 
-@bot.command(name='start-run', help='Defend a facility against a group of runners (defaults to group 1)')
+@bot.command(name='defend-facility', help='Defend a facility against a group of runners (defaults to group 1)')
 async def start_run(ctx: commands.context.Context, group_num=1):
     try:
         message = await pinned_message_from_context(ctx)
