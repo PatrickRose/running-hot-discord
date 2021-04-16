@@ -566,6 +566,7 @@ async def next_card(ctx: commands.context.Context, card=None):
         card = status.protection_cards[status.current_depth].card_id
         await play_card(ctx, card)
     else:
+        add = False
         if status.current_depth < len(status.protection_cards):
             next_card = status.protection_cards[status.current_depth].card_id
 
@@ -576,10 +577,13 @@ async def next_card(ctx: commands.context.Context, card=None):
 
             card = next_card
         else:
-            status.add_card(card)
+            add = True
 
         if not await play_card(ctx, card):
             return
+
+        if add:
+            status.add_card(card)
 
     await message.edit(content=status)
 
