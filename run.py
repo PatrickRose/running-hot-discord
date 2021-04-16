@@ -1013,8 +1013,7 @@ async def remove_facility(ctx: commands.context.Context, short_corp: str, facili
             table_string = tabulate(facilities, ["Facility name", "Facility Type"], tablefmt="github")
             message_contents = f'{corporation_name} facilities:\n```\n{table_string}\n```'
 
-            await channel.send(message_contents)
-            await message.delete()
+            await message.edit(contents=message_contents)
 
             channel = discord.utils.get(guild.channels, name=f'{short_corp}-{facility_name.lower()}')
 
