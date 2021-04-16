@@ -1026,7 +1026,7 @@ async def facility_from_message(message):
 @bot.command(name='roll', help='Rolls dice')
 async def roll_dice(ctx: commands.context.Context, die_string: str):
     try:
-        (amount, die_type) = die_string.split('d')
+        (amount, die_type) = die_string.lower().split('d')
         amount = int(amount)
         die_type = int(die_type)
     except ValueError:
@@ -1038,7 +1038,7 @@ async def roll_dice(ctx: commands.context.Context, die_string: str):
     values = [f"**{x}**" if x >= 5 else str(x) for x in values]
     success = list(filter(lambda x: x[0] == '*', values))
 
-    result = f'{len(success)}\nRolls: {", ".join(values)}'
+    result = f'{len(success)} successes\nRolls: {", ".join(values)}'
 
     await ctx.send(f'{ctx.message.author.mention} rolls `{die_string}`: {result}')
 
