@@ -273,6 +273,7 @@ async def on_command_error(ctx, error):
 )
 async def create_run(ctx, short_corp: str, facility: str):
     guild: discord.Guild = ctx.guild
+    short_corp = short_corp.lower()
 
     if short_corp not in CORPORATION_NAMES:
         await ctx.send(
@@ -461,7 +462,7 @@ async def run_status(ctx: commands.context.Context):
     await ctx.send(content=str(RunStatus.from_message(message)))
 
 
-@bot.command(name='defend-facility', help='Defend a facility against a group of runners (defaults to group 1)')
+@bot.command(name='start-run', help='Defend a facility against a group of runners (defaults to group 1)')
 async def start_run(ctx: commands.context.Context, group_num=1):
     try:
         message = await pinned_message_from_context(ctx)
@@ -906,6 +907,8 @@ async def build_starting_facilities(ctx: commands.context.Context):
 
 
 async def raw_build_facility(ctx: commands.context.Context, short_corp: str, facility_type: str, facility_name: str):
+    short_corp = short_corp.lower()
+    
     if short_corp not in CORPORATION_NAMES:
         raise ValueError(
             '{0} not found (must be one of {1})'.format(
@@ -921,7 +924,7 @@ async def raw_build_facility(ctx: commands.context.Context, short_corp: str, fac
 
     assert channel is not None, "facility-list was not found?"
 
-    corporation_name = CORPORATION_NAMES[short_corp]
+    corporation_name = CORPORATION_NAMES[short_corp.lower()]
 
     facilities = []
     message_to_edit: discord.message = None
@@ -988,7 +991,7 @@ async def build_facility(ctx: commands.context.Context, short_corp: str, facilit
         await ctx.reply(error.args[0])
 
 
-@bot.command(name='remove-facility', help='Remove a facility')
+@bot.command(name='destroy-facility', help='Remove a facility')
 @commands.has_role(control_role_name)
 async def remove_facility(ctx: commands.context.Context, short_corp: str, facility_name: str):
     from discord import TextChannel
@@ -1000,7 +1003,7 @@ async def remove_facility(ctx: commands.context.Context, short_corp: str, facili
 
     assert channel is not None, "facility-list was not found?"
 
-    corporation_name = CORPORATION_NAMES[short_corp]
+    corporation_name = CORPORATION_NAMES[short_corp.lower()]
 
     async for message in channel.history():
         if corporation_name in message.content:
