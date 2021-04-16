@@ -260,7 +260,7 @@ async def on_command_error(ctx, error):
         await ctx.send("Unknown command - try {0}help to see the available commands".format(command_prefix))
         pass
     elif isinstance(error, discord.ext.commands.errors.BadArgument):
-        await ctx.reply(error.args[0])
+        await ctx.reply(f"Command failed - did you pass an actual number in?\n`{error.args[0]}`")
     else:
         control = discord.utils.get(ctx.guild.roles, name='bot-master')
 
