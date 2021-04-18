@@ -25,7 +25,7 @@ bot = commands.Bot(command_prefix=command_prefix, intents=intents)
 
 group_regex = re.compile('Runner Group (\\d+): (.+)')
 defenders_regex = re.compile('Defenders: (.+)')
-alert_regex = re.compile('Alerts: (.*) \\(\\+\\d+\\)')
+alert_regex = re.compile('Alerts: (\d+).* \\(\\+\\d+\\)')
 active_group_regex = re.compile('Defending facility from group (\\d+)')
 
 
