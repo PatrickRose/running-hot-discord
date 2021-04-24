@@ -421,7 +421,7 @@ async def plot_run(ctx, description: str):
     control = discord.utils.get(guild.roles, name=control_role_name)
 
     if not text_channel:
-        await guild.create_text_channel(
+        text_channel = await guild.create_text_channel(
             name=channel_name,
             category=category,
             overwrites={
