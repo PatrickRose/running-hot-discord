@@ -5,6 +5,7 @@ import math
 import os
 import random
 import re
+from typing import Optional
 
 import discord
 import tabulate
@@ -268,6 +269,14 @@ async def on_command_error(ctx, error):
         raise error
 
 
+def author_on_run(author):
+    for role in author.roles:
+        if role.name.find('run-') == 0:
+            return True
+
+    return False
+
+
 @bot.command(
     name='run-facility',
 )
@@ -304,50 +313,59 @@ async def create_run(ctx, short_corp: str, facility: str):
         return
 
     # Make sure the runner isn't already on a run - that'd be naughty!
-    for role in ctx.author.roles:
-        if role.name.find('run-') == 0:
-            await ctx.send(
-                f'{ctx.message.author.mention} - you are already on a run!'
-            )
-            return
+    if author_on_run(ctx.author):
+        await ctx.reply('You are already on a run!')
+        return
 
     voice_channel: discord.VoiceChannel = discord.utils.get(category.voice_channels,
                                                             name=f'{short_corp}-{facility.lower()}')
 
-    role = None
-
     # Check if there's a run role already - if not we'll create a new one
-    for key in text_channel.overwrites:
-        if isinstance(key, discord.Role) and key.name.find('run-') == 0:
-            role = key
-            break
+    role = run_role_from_channel(text_channel)
 
     send_initiation_message = False
 
     if not role:
+        send_initiation_message = True
         # Work out what's the new run number
-        while True:
-            random_bytes = random.getrandbits(16)
+        role = await generate_run_role(guild)
 
-            role_name = f"run-{random_bytes}"
-            # Next, create the run-* role
-            role = discord.utils.get(guild.roles, name=role_name)
-
-            if not role:
-                role = await guild.create_role(name=role_name)
-                send_initiation_message = True
-                break
-
-    await text_channel.set_permissions(role, read_messages=True)
-    await voice_channel.set_permissions(role, view_channel=True)
+        await text_channel.set_permissions(role, read_messages=True)
+        await voice_channel.set_permissions(role, view_channel=True)
 
     corp_role: discord.Role = discord.utils.get(guild.roles, name=CORPORATION_ROLE_NAMES[short_corp])
 
+    await initiate_run(ctx.message.author, text_channel, corp_role, role, send_initiation_message)
+
+
+def run_role_from_channel(text_channel):
+    if text_channel:
+        for key in text_channel.overwrites:
+            if isinstance(key, discord.Role) and key.name.find('run-') == 0:
+                return key
+
+    return None
+
+
+async def generate_run_role(guild):
+    while True:
+        random_bytes = random.getrandbits(16)
+
+        role_name = f"run-{random_bytes}"
+        # Next, create the run-* role
+        role = discord.utils.get(guild.roles, name=role_name)
+
+        if not role:
+            role = await guild.create_role(name=role_name)
+            return role
+
+
+async def initiate_run(author, text_channel, role_to_mention, channel_role, send_initiation_message):
     if send_initiation_message:
 
         status = RunStatus()
 
-        status.add_to_group(1, ctx.message.author.nick)
+        status.add_to_group(1, author.nick)
 
         message = await text_channel.send(str(status))
 
@@ -355,7 +373,7 @@ async def create_run(ctx, short_corp: str, facility: str):
 
         await text_channel.send(
             "!!! RUN INITIATED !!!\n" +
-            f"{corp_role.mention} please send your security representative to defend\n" +
+            f"{role_to_mention.mention} please send your security representative to defend\n" +
             f"Once all runners have arrived and settled, start defending with `{command_prefix}start-run <group>`"
         )
 
@@ -371,17 +389,75 @@ async def create_run(ctx, short_corp: str, facility: str):
 
         status = RunStatus.from_message(message)
 
-        status.add_to_group(1, ctx.message.author.nick)
+        status.add_to_group(1, author.nick)
 
         await message.edit(content=status)
 
-    await ctx.message.author.add_roles(role)
-
+    await author.add_roles(channel_role)
     await text_channel.send(
-        f'{ctx.message.author.mention} has joined the run. ' +
+        f'{author.mention} has joined the run. ' +
         f'If you are defending, run `{command_prefix}defend`. ' +
         f'If there are multiple groups, run `{command_prefix}group <number>` to join the right group'
     )
+
+
+@bot.command(
+    name='run-plot', help="Make a run against an NPC target"
+)
+async def plot_run(ctx, description: str):
+    guild: discord.Guild = ctx.guild
+
+    category_name = 'runs-plot'
+    category: discord.CategoryChannel = discord.utils.get(guild.categories, name=category_name)
+    if not category:
+        category = await guild.create_category(category_name)
+
+    channel_name = description.lower()
+    text_channel: discord.TextChannel = discord.utils.get(category.text_channels,
+                                                          name=f'{channel_name}')
+    voice_channel: discord.VoiceChannel = discord.utils.get(category.voice_channels,
+                                                            name=f'{channel_name}')
+
+    control = discord.utils.get(guild.roles, name=control_role_name)
+
+    if not text_channel:
+        await guild.create_text_channel(
+            name=channel_name,
+            category=category,
+            overwrites={
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                control: discord.PermissionOverwrite(read_messages=True)
+            }
+        )
+
+        voice_channel = await guild.create_voice_channel(
+            name=channel_name,
+            category=category,
+            overwrites={
+                guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                control: discord.PermissionOverwrite(view_channel=True)
+            }
+        )
+
+    # Make sure the runner isn't already on a run - that'd be naughty!
+    if author_on_run(ctx.author):
+        await ctx.reply('You are already on a run!')
+        return
+
+    # Check if there's a run role already - if not we'll create a new one
+    role = run_role_from_channel(text_channel)
+
+    send_initiation_message = False
+
+    if not role:
+        send_initiation_message = True
+        # Work out what's the new run number
+        role = await generate_run_role(guild)
+
+        await text_channel.set_permissions(role, read_messages=True)
+        await voice_channel.set_permissions(role, view_channel=True)
+
+    await initiate_run(ctx.message.author, text_channel, control, role, send_initiation_message)
 
 
 @bot.command(name='defend', help='Switch to defending a run instead of attacking')
@@ -754,8 +830,28 @@ async def clear_runs(ctx):
                 except discord.DiscordException:
                     continue
 
-    from discord import Role
-    role: Role
+    plot_category: Optional[discord.CategoryChannel] = discord.utils.get(guild.categories, name='runs-plot')
+
+    if plot_category:
+        await ctx.send('Clearing plot channels')
+        channels = plot_category.text_channels
+
+        channel: discord.TextChannel
+        for channel in channels:
+            try:
+                await channel.delete()
+            except discord.DiscordException:
+                continue
+
+        channel: discord.VoiceChannel
+        channels = plot_category.voice_channels
+        for channel in channels:
+            try:
+                await channel.delete()
+            except discord.DiscordException:
+                continue
+
+    role: discord.Role
     for role in guild.roles:
         if role.name.find('run-') == 0:
             await role.delete()
